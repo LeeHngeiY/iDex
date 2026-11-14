@@ -1,0 +1,102 @@
+# Codemagic 构建配置：用 Codemagic 的 macOS 机器编译 iDex，拿未签名 IPA
+#
+# 放置位置：仓库根目录 codemagic.yaml（注意：不在 ci/ 里）
+# 使用前提：仓库里不需要额外加 scheme 文件，下面的编译命令用 -target iDex，
+#          绕开工程缺少共享 scheme 的问题。
+#
+# 两个工作流：
+#   idex-ipa        —— Xcode 27.1，功能完整（推荐先用这个）
+#   idex-ipa-sdk26  —— Xcode 用当前最新版 + 降级补丁，27 不可用时兜底用
+#                      （需额外提交 ci/patch_sdk26.py）
+
+workflows:
+  idex-ipa:
+    name: iDex IPA (Xcode 27)
+    instance_type: mac_mini_m2
+    max_build_duration: 90
+    environment:
+      # 若构建在 Preparing build machine 阶段报 “27.1 is not supported”，
+      # 按 Codemagic 文档的 Xcode 版本表改成当前可用的 27.x（如 27.0、27.1_beta）。
+      xcode: 27.1
+
+    scripts:
+      - name: 打印工具链
+        script: |
+          xcodebuild -version
+          echo "iOS SDK: $(xcrun --sdk iphoneos --show-sdk-version)"
+
+      - name: 编译（未签名）
+        script: |
+          set -e
+          xcodebuild build \
+            -project iDex.xcodeproj \
+            -target iDex \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath "$CM_BUILD_DIR/dd" \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            DEVELOPMENT_TEAM="" \
+            ONLY_ACTIVE_ARCH=NO
+
+      - name: 打包 IPA
+        script: |
+          set -e
+          APP="$CM_BUILD_DIR/dd/Build/Products/Release-iphoneos/iDex.app"
+          test -d "$APP"
+          mkdir -p "$CM_BUILD_DIR/out/Payload"
+          cp -R "$APP" "$CM_BUILD_DIR/out/Payload/"
+          cd "$CM_BUILD_DIR/out"
+          zip -qry iDex-unsigned.ipa Payload
+          ls -lh iDex-unsigned.ipa
+
+    artifacts:
+      - out/*.ipa
+
+  idex-ipa-sdk26:
+    name: iDex IPA (SDK26 降级兜底)
+    instance_type: mac_mini_m2
+    max_build_duration: 90
+    environment:
+      xcode: latest
+
+    scripts:
+      - name: 打印工具链
+        script: |
+          xcodebuild -version
+          echo "iOS SDK: $(xcrun --sdk iphoneos --show-sdk-version)"
+
+      - name: 应用 SDK26 降级补丁
+        script: python3 ci/patch_sdk26.py
+
+      - name: 编译（未签名）
+        script: |
+          set -e
+          xcodebuild build \
+            -project iDex.xcodeproj \
+            -target iDex \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath "$CM_BUILD_DIR/dd" \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            DEVELOPMENT_TEAM="" \
+            ONLY_ACTIVE_ARCH=NO
+
+      - name: 打包 IPA
+        script: |
+          set -e
+          APP="$CM_BUILD_DIR/dd/Build/Products/Release-iphoneos/iDex.app"
+          test -d "$APP"
+          mkdir -p "$CM_BUILD_DIR/out/Payload"
+          cp -R "$APP" "$CM_BUILD_DIR/out/Payload/"
+          cd "$CM_BUILD_DIR/out"
+          zip -qry iDex-sdk26.ipa Payload
+          ls -lh iDex-sdk26.ipa
+
+    artifacts:
+      - out/*.ipa
