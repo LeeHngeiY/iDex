@@ -12,7 +12,6 @@
 workflows:
   idex-ipa:
     name: iDex IPA (Xcode 27)
-    instance_type: mac_mini_m2
     max_build_duration: 90
     environment:
       # 若构建在 Preparing build machine 阶段报 “27.1 is not supported”，
@@ -33,7 +32,8 @@ workflows:
             -target iDex \
             -configuration Release \
             -sdk iphoneos \
-            -derivedDataPath "$CM_BUILD_DIR/dd" \
+            SYMROOT="$CM_BUILD_DIR/dd/build" \
+            OBJROOT="$CM_BUILD_DIR/dd/obj" \
             CODE_SIGN_STYLE=Manual \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
@@ -44,7 +44,7 @@ workflows:
       - name: 打包 IPA
         script: |
           set -e
-          APP="$CM_BUILD_DIR/dd/Build/Products/Release-iphoneos/iDex.app"
+          APP="$CM_BUILD_DIR/dd/build/Release-iphoneos/iDex.app"
           test -d "$APP"
           mkdir -p "$CM_BUILD_DIR/out/Payload"
           cp -R "$APP" "$CM_BUILD_DIR/out/Payload/"
@@ -57,7 +57,6 @@ workflows:
 
   idex-ipa-sdk26:
     name: iDex IPA (SDK26 降级兜底)
-    instance_type: mac_mini_m2
     max_build_duration: 90
     environment:
       xcode: latest
@@ -79,7 +78,8 @@ workflows:
             -target iDex \
             -configuration Release \
             -sdk iphoneos \
-            -derivedDataPath "$CM_BUILD_DIR/dd" \
+            SYMROOT="$CM_BUILD_DIR/dd/build" \
+            OBJROOT="$CM_BUILD_DIR/dd/obj" \
             CODE_SIGN_STYLE=Manual \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
@@ -90,7 +90,7 @@ workflows:
       - name: 打包 IPA
         script: |
           set -e
-          APP="$CM_BUILD_DIR/dd/Build/Products/Release-iphoneos/iDex.app"
+          APP="$CM_BUILD_DIR/dd/build/Release-iphoneos/iDex.app"
           test -d "$APP"
           mkdir -p "$CM_BUILD_DIR/out/Payload"
           cp -R "$APP" "$CM_BUILD_DIR/out/Payload/"
